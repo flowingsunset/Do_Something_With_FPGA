@@ -23,12 +23,12 @@
 module DS1302(
     input wire clk,
     input wire reset_p,
-    input wire [4:0] i_addr,
+    input wire [7:0] i_addr,
     input wire [7:0] i_data,
-    input wire i_RW,
     input wire i_valid,
     inout wire o_sda,
     output wire o_scl,
+    output wire o_ce,
     output wire o_busy,
     output reg [7:0] r_receive
 );
@@ -37,52 +37,56 @@ module DS1302(
 
 //Idle state. move to I_START if addr, data is valid(i_valid == 1)
 localparam S_IDLE = 0;
-//send Read(1) or Write(0)
-localparam S_RW = 1;
-//sending 5bit address
+localparam S_CE_ON = 1;
+
 localparam S_ADDR0 = 2;
 localparam S_ADDR1 = 3;
 localparam S_ADDR2 = 4;
 localparam S_ADDR3 = 5;
 localparam S_ADDR4 = 6;
-//select RAM or Chip
-localparam S_RC = 7;
-//Last address bit is always 1
-localparam S_ONE = 8;
+localparam S_ADDR5 = 7;
+localparam S_ADDR6 = 8;
+localparam S_ADDR7 = 9;
 
 //sending 8 bit data
-localparam S_WRITE0 = 9;
-localparam S_WRITE1 = 10;
-localparam S_WRITE2 = 11;
-localparam S_WRITE3 = 12;
-localparam S_WRITE4 = 13;
-localparam S_WRITE5 = 14;
-localparam S_WRITE6 = 15;
-localparam S_WRITE7 = 16;
+localparam S_WRITE0 = 10;
+localparam S_WRITE1 = 11;
+localparam S_WRITE2 = 12;
+localparam S_WRITE3 = 13;
+localparam S_WRITE4 = 14;
+localparam S_WRITE5 = 15;
+localparam S_WRITE6 = 16;
+localparam S_WRITE7 = 17;
+
 //reading 8 bit data
-localparam S_READ0 = 17;
-localparam S_READ1 = 18;
-localparam S_READ2 = 19;
-localparam S_READ3 = 20;
-localparam S_READ4 = 21;
-localparam S_READ5 = 22;
-localparam S_READ6 = 23;
-localparam S_READ7 = 24;
+localparam S_READ0 = 18;
+localparam S_READ1 = 19;
+localparam S_READ2 = 20;
+localparam S_READ3 = 21;
+localparam S_READ4 = 22;
+localparam S_READ5 = 23;
+localparam S_READ6 = 24;
+localparam S_READ7 = 25;
+
+localparam S_CE_OFF = 26;
 
 //state register
 reg [6:0]r_state, r_next_state;
 
 //
-reg [4:0] r_addr;
+reg [7:0] r_addr;
 reg [7:0] r_data;
 reg r_sda, r_scl;
 reg [1:0] r_cnt_i2c;
 reg r_RW;
+reg r_CE;
 
 assign o_sda = (r_state == S_READ0) || (r_state == S_READ1) || (r_state == S_READ2) || (r_state == S_READ3) || 
-               (r_state == S_READ4) || (r_state == S_READ5) || (r_state == S_READ6) || (r_state == S_READ7) ? 1'hz : r_sda;
+               (r_state == S_READ4) || (r_state == S_READ5) || (r_state == S_READ6) || (r_state == S_READ7) ? 'hz : r_sda;
 assign o_scl = r_scl;
-assign o_busy = (r_state == S_IDLE) ? 0 : 1;
+assign o_busy = (r_state == S_IDLE) || (r_state == S_CE_OFF) ? 0 : 1;
+assign o_ce = r_CE;
+
 always @(negedge clk, posedge reset_p ) begin
     if(reset_p) r_state <= 0;
     else r_state <= r_next_state;
@@ -90,46 +94,36 @@ end
 
 always @(posedge clk, posedge reset_p) begin
     if (reset_p) begin
-        r_next_state <= 0;
+        r_next_state <= S_IDLE;
         r_addr <= 0;
         r_data <= 0;
         r_scl <= 0;
         r_sda <= 0;
         r_cnt_i2c <= 0;
-        r_RW <= 0;
         r_receive <= 0;
+        r_CE <= 0;
     end else begin
         case (r_state)
             S_IDLE: begin
                 if (i_valid) begin
-                    r_next_state <= S_RW;
+                    r_next_state <= S_CE_ON;
                     r_addr <= i_addr;
                     r_data <= i_data;
-                    r_RW <= i_RW;
+                end
+                else begin
+                    r_next_state <= S_IDLE;
+                    r_addr <= 0;
+                    r_data <= 0;
+                    r_scl <= 0;
+                    r_sda <= 0;
+                    r_cnt_i2c <= 0;
                 end
             end
-            S_RW: begin
+            S_CE_ON: begin
                 r_cnt_i2c <= r_cnt_i2c + 1;
                 if (r_cnt_i2c >=3)r_next_state <= S_ADDR0;
-                else r_next_state <= S_RW;
-                case (r_cnt_i2c)
-                    0: begin
-                        r_scl <= 0;
-                        r_sda <= r_RW;
-                    end
-                    1: begin
-                        r_scl <= 1;
-                        r_sda <= r_RW;
-                    end
-                    2: begin
-                        r_scl <= 1;
-                        r_sda <= r_RW;
-                    end
-                    3: begin
-                        r_scl <= 0;
-                        r_sda <= r_RW;
-                    end
-                endcase
+                else r_next_state <= S_CE_ON;
+                r_CE <= 1;
             end
             S_ADDR0: begin
                 r_cnt_i2c <= r_cnt_i2c + 1;
@@ -141,7 +135,7 @@ always @(posedge clk, posedge reset_p) begin
                         r_sda <= r_addr[0];
                     end
                     1: begin
-                        r_scl <= 1;
+                        r_scl <= 0;
                         r_sda <= r_addr[0];
                     end
                     2: begin
@@ -164,7 +158,7 @@ always @(posedge clk, posedge reset_p) begin
                         r_sda <= r_addr[1];
                     end
                     1: begin
-                        r_scl <= 1;
+                        r_scl <= 0;
                         r_sda <= r_addr[1];
                     end
                     2: begin
@@ -187,7 +181,7 @@ always @(posedge clk, posedge reset_p) begin
                         r_sda <= r_addr[2];
                     end
                     1: begin
-                        r_scl <= 1;
+                        r_scl <= 0;
                         r_sda <= r_addr[2];
                     end
                     2: begin
@@ -210,7 +204,7 @@ always @(posedge clk, posedge reset_p) begin
                         r_sda <= r_addr[3];
                     end
                     1: begin
-                        r_scl <= 1;
+                        r_scl <= 0;
                         r_sda <= r_addr[3];
                     end
                     2: begin
@@ -225,7 +219,7 @@ always @(posedge clk, posedge reset_p) begin
             end
             S_ADDR4: begin
                 r_cnt_i2c <= r_cnt_i2c + 1;
-                if (r_cnt_i2c >=3)r_next_state <= S_RC;
+                if (r_cnt_i2c >=3)r_next_state <= S_ADDR5;
                 else r_next_state <= S_ADDR4;
                 case (r_cnt_i2c)
                     0: begin
@@ -233,7 +227,7 @@ always @(posedge clk, posedge reset_p) begin
                         r_sda <= r_addr[4];
                     end
                     1: begin
-                        r_scl <= 1;
+                        r_scl <= 0;
                         r_sda <= r_addr[4];
                     end
                     2: begin
@@ -246,52 +240,75 @@ always @(posedge clk, posedge reset_p) begin
                     end
                 endcase
             end
-            S_RC: begin
+            S_ADDR5: begin
                 r_cnt_i2c <= r_cnt_i2c + 1;
-                if (r_cnt_i2c >=3)r_next_state <= S_ONE;
-                else r_next_state <= S_RC;
+                if (r_cnt_i2c >=3)r_next_state <= S_ADDR6;
+                else r_next_state <= S_ADDR5;
                 case (r_cnt_i2c)
                     0: begin
                         r_scl <= 0;
-                        r_sda <= 1'b0;
+                        r_sda <= r_addr[5];
                     end
                     1: begin
-                        r_scl <= 1;
-                        r_sda <= 1'b0;
+                        r_scl <= 0;
+                        r_sda <= r_addr[5];
                     end
                     2: begin
                         r_scl <= 1;
-                        r_sda <= 1'b0;
+                        r_sda <= r_addr[5];
                     end
                     3: begin
                         r_scl <= 0;
-                        r_sda <= 1'b0;
+                        r_sda <= r_addr[5];
                     end
                 endcase
             end
-            S_ONE: begin
+            S_ADDR6: begin
                 r_cnt_i2c <= r_cnt_i2c + 1;
-                if (r_cnt_i2c >=3)begin
-                    if(r_RW == 0)r_next_state <= S_WRITE0;
-                    else if(r_RW == 1) r_next_state <= S_READ0;
+                if (r_cnt_i2c >=3)r_next_state <= S_ADDR7;
+                else r_next_state <= S_ADDR6;
+                case (r_cnt_i2c)
+                    0: begin
+                        r_scl <= 0;
+                        r_sda <= r_addr[6];
+                    end
+                    1: begin
+                        r_scl <= 0;
+                        r_sda <= r_addr[6];
+                    end
+                    2: begin
+                        r_scl <= 1;
+                        r_sda <= r_addr[6];
+                    end
+                    3: begin
+                        r_scl <= 0;
+                        r_sda <= r_addr[6];
+                    end
+                endcase
+            end
+            S_ADDR7: begin
+                r_cnt_i2c <= r_cnt_i2c + 1;
+                if (r_cnt_i2c >=3) begin
+                    if(r_addr[0] == 0) r_next_state <= S_WRITE0;
+                    else if(r_addr[0] == 1) r_next_state <= S_READ0;
                 end
-                else r_next_state <= S_ONE;
+                else r_next_state <= S_ADDR7;
                 case (r_cnt_i2c)
                     0: begin
                         r_scl <= 0;
-                        r_sda <= r_addr[0];
+                        r_sda <= r_addr[7];
                     end
                     1: begin
-                        r_scl <= 1;
-                        r_sda <= r_addr[0];
+                        r_scl <= 0;
+                        r_sda <= r_addr[7];
                     end
                     2: begin
                         r_scl <= 1;
-                        r_sda <= r_addr[0];
+                        r_sda <= r_addr[7];
                     end
                     3: begin
                         r_scl <= 0;
-                        r_sda <= r_addr[0];
+                        r_sda <= r_addr[7];
                     end
                 endcase
             end
@@ -305,7 +322,7 @@ always @(posedge clk, posedge reset_p) begin
                         r_sda <= r_data[0];
                     end
                     1: begin
-                        r_scl <= 1;
+                        r_scl <= 0;
                         r_sda <= r_data[0];
                     end
                     2: begin
@@ -328,7 +345,7 @@ always @(posedge clk, posedge reset_p) begin
                         r_sda <= r_data[1];
                     end
                     1: begin
-                        r_scl <= 1;
+                        r_scl <= 0;
                         r_sda <= r_data[1];
                     end
                     2: begin
@@ -351,7 +368,7 @@ always @(posedge clk, posedge reset_p) begin
                         r_sda <= r_data[2];
                     end
                     1: begin
-                        r_scl <= 1;
+                        r_scl <= 0;
                         r_sda <= r_data[2];
                     end
                     2: begin
@@ -374,7 +391,7 @@ always @(posedge clk, posedge reset_p) begin
                         r_sda <= r_data[3];
                     end
                     1: begin
-                        r_scl <= 1;
+                        r_scl <= 0;
                         r_sda <= r_data[3];
                     end
                     2: begin
@@ -397,7 +414,7 @@ always @(posedge clk, posedge reset_p) begin
                         r_sda <= r_data[4];
                     end
                     1: begin
-                        r_scl <= 1;
+                        r_scl <= 0;
                         r_sda <= r_data[4];
                     end
                     2: begin
@@ -420,7 +437,7 @@ always @(posedge clk, posedge reset_p) begin
                         r_sda <= r_data[5];
                     end
                     1: begin
-                        r_scl <= 1;
+                        r_scl <= 0;
                         r_sda <= r_data[5];
                     end
                     2: begin
@@ -443,7 +460,7 @@ always @(posedge clk, posedge reset_p) begin
                         r_sda <= r_data[6];
                     end
                     1: begin
-                        r_scl <= 1;
+                        r_scl <= 0;
                         r_sda <= r_data[6];
                     end
                     2: begin
@@ -466,7 +483,7 @@ always @(posedge clk, posedge reset_p) begin
                         r_sda <= r_data[7];
                     end
                     1: begin
-                        r_scl <= 1;
+                        r_scl <= 0;
                         r_sda <= r_data[7];
                     end
                     2: begin
@@ -489,12 +506,12 @@ always @(posedge clk, posedge reset_p) begin
                         r_sda <= 0;
                     end
                     1: begin
-                        r_scl <= 1;
+                        r_scl <= 0;
                         r_receive[0] <= o_sda;
                     end
                     2: begin
                         r_scl <= 1;
-                        r_receive[0] <= o_sda;
+                        r_sda <= 0;
                     end
                     3: begin
                         r_scl <= 0;
@@ -512,12 +529,12 @@ always @(posedge clk, posedge reset_p) begin
                         r_sda <= 0;
                     end
                     1: begin
-                        r_scl <= 1;
+                        r_scl <= 0;
                         r_receive[1] <= o_sda;
                     end
                     2: begin
                         r_scl <= 1;
-                        r_receive[1] <= o_sda;
+                        r_sda <= 0;
                     end
                     3: begin
                         r_scl <= 0;
@@ -535,12 +552,12 @@ always @(posedge clk, posedge reset_p) begin
                         r_sda <= 0;
                     end
                     1: begin
-                        r_scl <= 1;
+                        r_scl <= 0;
                         r_receive[2] <= o_sda;
                     end
                     2: begin
                         r_scl <= 1;
-                        r_receive[2] <= o_sda;
+                        r_sda <= 0;
                     end
                     3: begin
                         r_scl <= 0;
@@ -558,12 +575,12 @@ always @(posedge clk, posedge reset_p) begin
                         r_sda <= 0;
                     end
                     1: begin
-                        r_scl <= 1;
+                        r_scl <= 0;
                         r_receive[3] <= o_sda;
                     end
                     2: begin
                         r_scl <= 1;
-                        r_receive[3] <= o_sda;
+                        r_sda <= 0;
                     end
                     3: begin
                         r_scl <= 0;
@@ -581,12 +598,12 @@ always @(posedge clk, posedge reset_p) begin
                         r_sda <= 0;
                     end
                     1: begin
-                        r_scl <= 1;
+                        r_scl <= 0;
                         r_receive[4] <= o_sda;
                     end
                     2: begin
                         r_scl <= 1;
-                        r_receive[4] <= o_sda;
+                        r_sda <= 0;
                     end
                     3: begin
                         r_scl <= 0;
@@ -604,12 +621,12 @@ always @(posedge clk, posedge reset_p) begin
                         r_sda <= 0;
                     end
                     1: begin
-                        r_scl <= 1;
+                        r_scl <= 0;
                         r_receive[5] <= o_sda;
                     end
                     2: begin
                         r_scl <= 1;
-                        r_receive[5] <= o_sda;
+                        r_sda <= 0;
                     end
                     3: begin
                         r_scl <= 0;
@@ -627,12 +644,12 @@ always @(posedge clk, posedge reset_p) begin
                         r_sda <= 0;
                     end
                     1: begin
-                        r_scl <= 1;
+                        r_scl <= 0;
                         r_receive[6] <= o_sda;
                     end
                     2: begin
                         r_scl <= 1;
-                        r_receive[6] <= o_sda;
+                        r_sda <= 0;
                     end
                     3: begin
                         r_scl <= 0;
@@ -642,7 +659,7 @@ always @(posedge clk, posedge reset_p) begin
             end
             S_READ7: begin
                 r_cnt_i2c <= r_cnt_i2c + 1;
-                if (r_cnt_i2c >=3)r_next_state <= S_IDLE;
+                if (r_cnt_i2c >=3)r_next_state <= S_CE_OFF;
                 else r_next_state <= S_READ7;
                 case (r_cnt_i2c)
                     0: begin
@@ -650,18 +667,24 @@ always @(posedge clk, posedge reset_p) begin
                         r_sda <= 0;
                     end
                     1: begin
-                        r_scl <= 1;
+                        r_scl <= 0;
                         r_receive[7] <= o_sda;
                     end
                     2: begin
-                        r_scl <= 1;
-                        r_receive[7] <= o_sda;
+                        r_scl <= 0;
+                        r_sda <= 0;
                     end
                     3: begin
                         r_scl <= 0;
                         r_sda <= 0;
                     end
                 endcase
+            end
+            S_CE_OFF: begin
+                r_cnt_i2c <= r_cnt_i2c + 1;
+                if (r_cnt_i2c >=3)r_next_state <= S_IDLE;
+                else r_next_state <= S_CE_OFF;
+                r_CE <= 0;
             end
         endcase
     end
