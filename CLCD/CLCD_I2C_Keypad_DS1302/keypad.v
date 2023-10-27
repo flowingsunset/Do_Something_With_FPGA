@@ -1,8 +1,11 @@
 module Keypad (
+	//system signal
 	input i_clk,
 	input i_reset,
+	//btw keypad hardware
 	input [3:0]i_col,
 	output [3:0]o_row,
+	//btw control module
 	output reg [3:0] o_data,
 	output o_btn_valid
 );

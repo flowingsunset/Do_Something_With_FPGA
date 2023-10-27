@@ -44,6 +44,10 @@ module CLCD_signal_generator(
     always @(posedge clk) begin
         if(reset_p)begin
             r_next_state <= S_IDLE;
+            r_data <= 0;
+            r_RW <= 0;
+            r_RS <= 0;
+            r_state_on <= 0;
             o_data <= 0;
             o_RW <= 0;
             r_RS <= 0;
@@ -58,7 +62,7 @@ module CLCD_signal_generator(
                         r_next_state <= S_WRITE_1;
                         r_data <= i_data;
                         r_RW <= i_RW;
-                        r_RS <= r_RS;
+                        r_RS <= i_RS;
                     end else begin
                         r_next_state <= S_IDLE;
                     end

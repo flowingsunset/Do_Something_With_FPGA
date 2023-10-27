@@ -67,7 +67,7 @@ module CLCD_init_reg (
                 //input initial state 1 0011 0011 / 1100 1000 delay 5ms
                 1: begin
                     if(!r_state_on) begin
-                        r_data <= 8'b0000_0011;
+                        r_data <= 8'b0011_0000;
                         o_RW <= 0;
                         o_RS <= 0;
                         o_valid <= 1;
@@ -86,7 +86,7 @@ module CLCD_init_reg (
                 //input initial state 2 0011 0011 / 1100 1000
                 2 : begin
                     if(!r_state_on) begin
-                        r_data <= 8'b0000_0011;
+                        r_data <= 8'b0011_0000;
                         o_RW <= 0;
                         o_RS <= 0;
                         o_valid <= 1;
@@ -105,7 +105,7 @@ module CLCD_init_reg (
                 //input initial state 3 0011 0011 / 1100 1000
                 3: begin
                     if(!r_state_on) begin
-                        r_data <= 8'b0000_0011;
+                        r_data <= 8'b0011_0000;
                         o_RW <= 0;
                         o_RS <= 0;
                         o_valid <= 1;

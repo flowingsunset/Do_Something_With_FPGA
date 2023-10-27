@@ -1,14 +1,17 @@
 module i2c_master (
+    //system signal
     input wire clk,
     input wire reset_p,
+    //btw control module
     input wire [6:0] i_addr,
     input wire [7:0] i_data,
     input wire i_RW,
     input wire i_valid,
-    output wire o_sda,
-    output wire o_scl,
     output wire o_busy,
-    output reg [7:0] r_receive
+    output reg [7:0] r_receive,
+    //btw i2c wire
+    output wire o_sda,
+    output wire o_scl
 );
 
 //no ack and no read

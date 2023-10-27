@@ -25,8 +25,8 @@ module DS1302_top(
     input reset_p,
     input [6:0] sw,
 
-    inout o_sda,
-    output o_scl,
+    inout o_io,
+    output o_sclk,
     output o_ce,
 
     output [3:0] an,
@@ -63,7 +63,7 @@ module DS1302_top(
 
 
     DS1302 ds1302(.clk(r_cnt_400khz[14]), .reset_p(reset_p), .i_addr(w_addr), .i_data(8'h0), .i_valid(w_valid),
-                  .o_sda(o_sda), .o_scl(o_scl), .o_ce(o_ce), .o_busy(w_busy), .r_receive(w_receive));
+                  .o_io(o_io), .o_sclk(o_sclk), .o_ce(o_ce), .o_busy(w_busy), .r_receive(w_receive));
     edge_detector_n edn0(.clk(clk), .cp_in(w_busy),.reset_p(reset_p), .p_edge(w_busy_pedge), .n_edge(w_busy_nedge));
     
     FND_4digit_ctrl fnd(.clk(clk), .reset_p(reset_p), .value({1'b0, sw, w_receive}), .com(an), .seg_7(seg));

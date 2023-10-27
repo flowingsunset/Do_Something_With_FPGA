@@ -21,16 +21,21 @@
 
 
 module DS1302(
+    //btw system
     input wire clk,
     input wire reset_p,
+    //btw control module
     input wire [7:0] i_addr,
     input wire [7:0] i_data,
     input wire i_valid,
-    inout wire o_sda,
-    output wire o_scl,
-    output wire o_ce,
     output wire o_busy,
-    output reg [7:0] r_receive
+    output reg [7:0] r_receive,
+    //to DS1302
+    inout wire o_io,
+    output wire o_sclk,
+    output wire o_ce
+    
+    
 );
 
 //assume clk = 400kHz  ->  scl = 100kHz
@@ -81,9 +86,9 @@ reg [1:0] r_cnt_i2c;
 reg r_RW;
 reg r_CE;
 
-assign o_sda = (r_state == S_READ0) || (r_state == S_READ1) || (r_state == S_READ2) || (r_state == S_READ3) || 
+assign o_io = (r_state == S_READ0) || (r_state == S_READ1) || (r_state == S_READ2) || (r_state == S_READ3) || 
                (r_state == S_READ4) || (r_state == S_READ5) || (r_state == S_READ6) || (r_state == S_READ7) ? 'hz : r_sda;
-assign o_scl = r_scl;
+assign o_sclk = r_scl;
 assign o_busy = (r_state == S_IDLE) || (r_state == S_CE_OFF) ? 0 : 1;
 assign o_ce = r_CE;
 
@@ -507,7 +512,7 @@ always @(posedge clk, posedge reset_p) begin
                     end
                     1: begin
                         r_scl <= 0;
-                        r_receive[0] <= o_sda;
+                        r_receive[0] <= o_io;
                     end
                     2: begin
                         r_scl <= 1;
@@ -530,7 +535,7 @@ always @(posedge clk, posedge reset_p) begin
                     end
                     1: begin
                         r_scl <= 0;
-                        r_receive[1] <= o_sda;
+                        r_receive[1] <= o_io;
                     end
                     2: begin
                         r_scl <= 1;
@@ -553,7 +558,7 @@ always @(posedge clk, posedge reset_p) begin
                     end
                     1: begin
                         r_scl <= 0;
-                        r_receive[2] <= o_sda;
+                        r_receive[2] <= o_io;
                     end
                     2: begin
                         r_scl <= 1;
@@ -576,7 +581,7 @@ always @(posedge clk, posedge reset_p) begin
                     end
                     1: begin
                         r_scl <= 0;
-                        r_receive[3] <= o_sda;
+                        r_receive[3] <= o_io;
                     end
                     2: begin
                         r_scl <= 1;
@@ -599,7 +604,7 @@ always @(posedge clk, posedge reset_p) begin
                     end
                     1: begin
                         r_scl <= 0;
-                        r_receive[4] <= o_sda;
+                        r_receive[4] <= o_io;
                     end
                     2: begin
                         r_scl <= 1;
@@ -622,7 +627,7 @@ always @(posedge clk, posedge reset_p) begin
                     end
                     1: begin
                         r_scl <= 0;
-                        r_receive[5] <= o_sda;
+                        r_receive[5] <= o_io;
                     end
                     2: begin
                         r_scl <= 1;
@@ -645,7 +650,7 @@ always @(posedge clk, posedge reset_p) begin
                     end
                     1: begin
                         r_scl <= 0;
-                        r_receive[6] <= o_sda;
+                        r_receive[6] <= o_io;
                     end
                     2: begin
                         r_scl <= 1;
@@ -668,7 +673,7 @@ always @(posedge clk, posedge reset_p) begin
                     end
                     1: begin
                         r_scl <= 0;
-                        r_receive[7] <= o_sda;
+                        r_receive[7] <= o_io;
                     end
                     2: begin
                         r_scl <= 0;
