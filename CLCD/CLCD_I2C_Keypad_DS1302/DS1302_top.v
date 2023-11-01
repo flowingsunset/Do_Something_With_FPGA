@@ -1,29 +1,11 @@
 `timescale 1ns / 1ps
-//////////////////////////////////////////////////////////////////////////////////
-// Company: 
-// Engineer: 
-// 
-// Create Date: 2023/10/10 18:45:06
-// Design Name: 
-// Module Name: DS1302_top
-// Project Name: 
-// Target Devices: 
-// Tool Versions: 
-// Description: 
-// 
-// Dependencies: 
-// 
-// Revision:
-// Revision 0.01 - File Created
-// Additional Comments:
-// 
-//////////////////////////////////////////////////////////////////////////////////
-
 
 module DS1302_top(
     input clk,
     input reset_p,
-    input [6:0] sw,
+    input [7:0] sw1,
+    input [7:0] sw2,
+    input EN,
 
     inout o_io,
     output o_sclk,
@@ -42,11 +24,13 @@ module DS1302_top(
     wire w_busy_pedge, w_busy_nedge;
 
     reg [7:0] r_addr;
+    reg [7:0] r_data;
     reg r_state_on;
     reg r_valid;
 
     assign w_valid = r_valid;
     assign w_addr = r_addr;
+    assign w_data = r_data;
     assign w_RW = 1'b1;
 
    
@@ -62,28 +46,22 @@ module DS1302_top(
     end
 
 
-    DS1302 ds1302(.clk(r_cnt_400khz[14]), .reset_p(reset_p), .i_addr(w_addr), .i_data(8'h0), .i_valid(w_valid),
+    DS1302 ds1302(.clk(r_cnt_400khz[14]), .reset_p(reset_p), .i_addr(w_addr), .i_data(w_data), .i_valid(w_valid),
                   .o_io(o_io), .o_sclk(o_sclk), .o_ce(o_ce), .o_busy(w_busy), .r_receive(w_receive));
     edge_detector_n edn0(.clk(clk), .cp_in(w_busy),.reset_p(reset_p), .p_edge(w_busy_pedge), .n_edge(w_busy_nedge));
     
-    FND_4digit_ctrl fnd(.clk(clk), .reset_p(reset_p), .value({1'b0, sw, w_receive}), .com(an), .seg_7(seg));
+    FND_4digit_ctrl fnd(.clk(clk), .reset_p(reset_p), .value({8'h0, w_receive}), .com(an), .seg_7(seg));
 
     always @(posedge clk ) begin
         if (reset_p) begin
             r_addr <= 0;
+            r_data <= 0;
             r_state_on <= 0;
             r_valid <= 0;
         end else begin
-            if(r_state_on == 0 && sw>0) begin
-                case (sw)
-                    7'h01: r_addr <= 8'h81;
-                    7'h02: r_addr <= 8'h83;
-                    7'h04: r_addr <= 8'h85;
-                    7'h08: r_addr <= 8'h87;
-                    7'h10: r_addr <= 8'h89;
-                    7'h20: r_addr <= 8'h8b;
-                    7'h40: r_addr <= 8'h8d;
-                endcase
+            if(r_state_on == 0 && EN) begin
+                r_addr <= sw1;
+                r_data <= sw2;
                 r_state_on <= 1;
                 r_valid <= 1;
             end

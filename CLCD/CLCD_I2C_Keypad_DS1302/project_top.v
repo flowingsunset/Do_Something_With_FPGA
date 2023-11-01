@@ -1,30 +1,8 @@
 `timescale 1ns / 1ps
-//////////////////////////////////////////////////////////////////////////////////
-// Company: 
-// Engineer: 
-// 
-// Create Date: 2023/10/11 19:28:38
-// Design Name: 
-// Module Name: project_top
-// Project Name: 
-// Target Devices: 
-// Tool Versions: 
-// Description: 
-// 
-// Dependencies: 
-// 
-// Revision:
-// Revision 0.01 - File Created
-// Additional Comments:
-// 
-//////////////////////////////////////////////////////////////////////////////////
-
 
 module project_top(
     input clk,
     input reset_p,
-    //debug
-    output [9:0] led,
     //input output CLCD
     output o_sda,
     output o_scl,
@@ -32,6 +10,9 @@ module project_top(
     inout o_io,
     output o_ce,
     output o_sclk
+    //input output Keypad
+    // input [3:0]i_col,
+	// output [3:0]o_row
     );
 
     reg r_clk_400khz;
@@ -81,7 +62,9 @@ module project_top(
     //i2c_master
     wire w_busy_I2C;
 
-    //debug
+    //keypad
+    //wire [3:0] w_data_keypad;
+    //wire w_valid_keypad;
 
     assign w_data_sys_reg = w_empty_reg ? w_data_SYS2CLCD : w_data_reg;
     assign w_RS_sys_reg = w_empty_reg ? w_RS_SYS2CLCD : w_RS_reg;
@@ -90,8 +73,6 @@ module project_top(
 
     system_control system_control(
     .clk(clk), .reset_p(reset_p),
-    //debug
-    .led(led),
     //from i2c_reg
     .empty_reg(w_empty_reg),
     //btw DS1302
@@ -108,8 +89,8 @@ module project_top(
     .busy_CLCD(w_busy_CLCD)
     //input [7:0] receive_I2C,  //not use this time
     //btw Keypad    not use now
-    // input [3:0] data_Keypad,
-    // input valid_Keypad
+    //.data_Keypad(w_data_keypad),
+    //.valid_Keypad(w_valid_keypad)
     );
 
 
@@ -128,5 +109,7 @@ module project_top(
     
     DS1302 ds1302(.clk(r_clk_400khz), .reset_p(reset_p), .i_addr(w_addr_SYS2RTC), .i_data(8'h0), .i_valid(w_valid_SYS2RTC),
                   .o_io(o_io), .o_sclk(o_sclk), .o_ce(o_ce), .o_busy(w_busy_RTC), .r_receive(w_receive_RTC));
+
+    //Keypad kpd(.i_clk(clk),.i_reset(reset_p),.i_col(i_col),. o_row(o_row),. o_data(w_data_keypad),.o_btn_valid(w_valid_keypad));
 
 endmodule

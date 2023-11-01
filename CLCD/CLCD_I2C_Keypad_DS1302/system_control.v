@@ -2,8 +2,6 @@
 module system_control(
     input clk,
     input reset_p,
-    //debug
-    output reg [9:0] led,
     //from i2c_reg
     input empty_reg,
     //btw DS1302
@@ -20,27 +18,43 @@ module system_control(
     input busy_CLCD
     //input [7:0] receive_I2C,  //not use this time
     //btw Keypad
-    // input [3:0] data_Keypad,
-    // input valid_Keypad
+    //input [3:0] data_Keypad,
+    //input valid_Keypad
     );
 
-    
+    localparam ASCII_A = 00;
+    localparam ASCII_C = 01;
+    localparam ASCII_E = 02;
+    localparam ASCII_H = 03;
+    localparam ASCII_I = 04;
+    localparam ASCII_M = 05;
+    localparam ASCII_N = 06;
+    localparam ASCII_O = 07;
+    localparam ASCII_R = 08;
+    localparam ASCII_S = 09;
+    localparam ASCII_T = 10;
+    localparam ASCII_U = 11;
+    localparam ASCII_Y = 12;
+    localparam ASCII_EMPTY = 13;
 
-    localparam S_INITIAL =      00;
-    localparam S_IDLE =         01;
-    localparam S_READ_YEAR =    02;
-    localparam S_READ_MONTH =   03;
-    localparam S_READ_DAY =     04;
-    localparam S_READ_HOUR =    05;
-    localparam S_READ_MINUTE =  06;
-    localparam S_READ_SECOND =  07;
-    localparam S_WRITE_ALL =    08;
-    localparam S_RETURN_HOME =  09;
+    localparam S_INITIAL =          00;
+    localparam S_IDLE =             01;
+    localparam S_READ_YEAR =        02;
+    localparam S_READ_MONTH =       03;
+    localparam S_READ_DAY =         04;
+    localparam S_READ_HOUR =        05;
+    localparam S_READ_MINUTE =      06;
+    localparam S_READ_SECOND =      07;
+    localparam S_WRITE_TIME =       08;
+    localparam S_CHANGE_LINE =      09;
+    localparam S_WRITE_SETTING =    10;
+    localparam S_RETURN_HOME =      11;
 
     //signal regsiter for FSM
     reg [3:0] r_state, r_next_state;
     reg r_end_read_year, r_end_read_month, r_end_read_day, r_end_read_hour, r_end_read_minute, r_end_read_second;
     reg [13:0] r_end_write;
+    reg r_end_change_line;
     reg r_end_return;
 
     //signal register for RTC
@@ -51,47 +65,51 @@ module system_control(
     reg [3:0] r_date [13:0];
 
 
+    function [7:0] f_num2ascii;
+        input [3:0] num;
+        case (num)
+            4'h0: f_num2ascii = 8'h30;  //'0'
+            4'h1: f_num2ascii = 8'h31;
+            4'h2: f_num2ascii = 8'h32;
+            4'h3: f_num2ascii = 8'h33;
+            4'h4: f_num2ascii = 8'h34;
+            4'h5: f_num2ascii = 8'h35;
+            4'h6: f_num2ascii = 8'h36;
+            4'h7: f_num2ascii = 8'h37;
+            4'h8: f_num2ascii = 8'h38;
+            4'h9: f_num2ascii = 8'h39;  //'9'
+            default: f_num2ascii = 8'h21; //'!'
+        endcase
+    endfunction
 
     function [7:0] f_hex2ascii;
         input [3:0] hex;
         case (hex)
-            4'h0: f_hex2ascii = 8'h30;
-            4'h1: f_hex2ascii = 8'h31;
-            4'h2: f_hex2ascii = 8'h32;
-            4'h3: f_hex2ascii = 8'h33;
-            4'h4: f_hex2ascii = 8'h34;
-            4'h5: f_hex2ascii = 8'h35;
-            4'h6: f_hex2ascii = 8'h36;
-            4'h7: f_hex2ascii = 8'h37;
-            4'h8: f_hex2ascii = 8'h38;
-            4'h9: f_hex2ascii = 8'h39;
-            default: f_hex2ascii = 8'h21; //'!'
+            ASCII_A: f_hex2ascii = 8'h41;
+            ASCII_C: f_hex2ascii = 8'h43;
+            ASCII_E: f_hex2ascii = 8'h45;
+            ASCII_H: f_hex2ascii = 8'h48;
+            ASCII_I: f_hex2ascii = 8'h49;
+            ASCII_M: f_hex2ascii = 8'h4d;
+            ASCII_N: f_hex2ascii = 8'h4e;
+            ASCII_O: f_hex2ascii = 8'h4f;
+            ASCII_R: f_hex2ascii = 8'h52;
+            ASCII_S: f_hex2ascii = 8'h53;
+            ASCII_T: f_hex2ascii = 8'h54;
+            ASCII_U: f_hex2ascii = 8'h55;
+            ASCII_Y: f_hex2ascii = 8'h59;
+            ASCII_EMPTY: f_hex2ascii = 8'h20;
+            default: f_hex2ascii = 8'h21;
         endcase
-        
     endfunction
+
+
 
     //edge detector
     wire w_busy_RTC_pedge, w_busy_RTC_nedge;
     edge_detector_n edp0(.clk(clk), .cp_in(busy_RTC),.reset_p(reset_p), .p_edge(w_busy_RTC_pedge), .n_edge(w_busy_RTC_nedge));
     wire w_busy_CLCD_pedge, w_busy_CLCD_nedge;
     edge_detector_n edp1(.clk(clk), .cp_in(busy_CLCD),.reset_p(reset_p), .p_edge(w_busy_CLCD_pedge), .n_edge(w_busy_CLCD_nedge));
-
-    always @(*) begin
-        case (r_state)
-            S_INITIAL: led = 10'h001;
-            S_IDLE: led = 10'h002;
-            S_READ_YEAR: led = 10'h004;
-            S_READ_MONTH: led = 10'h008;
-            S_READ_DAY: led = 10'h010;
-            S_READ_HOUR: led = 10'h020;
-            S_READ_MINUTE: led = 10'h040;
-            S_READ_SECOND: led = 10'h080;
-            S_WRITE_ALL: led = 10'h100;
-            S_RETURN_HOME: led = 10'h200;
-            default: led = 10'h0;
-        endcase
-    end
-
 
     //state
     always @(posedge clk) begin
@@ -137,12 +155,20 @@ module system_control(
                     else r_next_state = S_READ_MINUTE;
                 end
                 S_READ_SECOND: begin
-                    if(r_end_read_second) r_next_state = S_WRITE_ALL;
+                    if(r_end_read_second) r_next_state = S_WRITE_TIME;
                     else r_next_state = S_READ_SECOND;
                 end
-                S_WRITE_ALL: begin
+                S_WRITE_TIME: begin
+                    if(r_end_write == 14'h3fff) r_next_state = S_CHANGE_LINE;
+                    else r_next_state = S_WRITE_TIME;
+                end
+                S_CHANGE_LINE: begin
+                    if(r_end_change_line) r_next_state = S_WRITE_SETTING;
+                    else r_next_state = S_CHANGE_LINE;
+                end
+                S_WRITE_SETTING: begin
                     if(r_end_write == 14'h3fff) r_next_state = S_RETURN_HOME;
-                    else r_next_state = S_WRITE_ALL;
+                    else r_next_state = S_WRITE_SETTING;
                 end
                 S_RETURN_HOME: begin
                     if(r_end_return) r_next_state = S_IDLE;
@@ -306,11 +332,11 @@ module system_control(
                     r_end_write <= 14'h0;
                     r_end_return <= 0;
                 end 
-                S_WRITE_ALL: begin
+                S_WRITE_TIME: begin
                     case (r_end_write)
                         14'b00_0000_0000_0000: begin
                             if(!r_flag_CLCD && !r_end_write[0])begin
-                                data_CLCD <= f_hex2ascii(r_date[0]);
+                                data_CLCD <= f_num2ascii(r_date[0]);
                                 RS_CLCD <= 1;
                                 RW_CLCD <= 0;
                                 valid_CLCD <= 1;
@@ -326,7 +352,7 @@ module system_control(
                         end 
                         14'b00_0000_0000_0001: begin
                             if(!r_flag_CLCD && !r_end_write[1])begin
-                                data_CLCD <= f_hex2ascii(r_date[1]);
+                                data_CLCD <= f_num2ascii(r_date[1]);
                                 RS_CLCD <= 1;
                                 RW_CLCD <= 0;
                                 valid_CLCD <= 1;
@@ -342,7 +368,7 @@ module system_control(
                         end
                         14'b00_0000_0000_0011: begin
                             if(!r_flag_CLCD && !r_end_write[2])begin
-                                data_CLCD <= f_hex2ascii(r_date[2]);
+                                data_CLCD <= f_num2ascii(r_date[2]);
                                 RS_CLCD <= 1;
                                 RW_CLCD <= 0;
                                 valid_CLCD <= 1;
@@ -358,7 +384,7 @@ module system_control(
                         end
                         14'b00_0000_0000_0111: begin
                             if(!r_flag_CLCD && !r_end_write[3])begin
-                                data_CLCD <= f_hex2ascii(r_date[3]);
+                                data_CLCD <= f_num2ascii(r_date[3]);
                                 RS_CLCD <= 1;
                                 RW_CLCD <= 0;
                                 valid_CLCD <= 1;
@@ -374,7 +400,7 @@ module system_control(
                         end
                         14'b00_0000_0000_1111: begin
                             if(!r_flag_CLCD && !r_end_write[4])begin
-                                data_CLCD <= f_hex2ascii(r_date[4]);
+                                data_CLCD <= f_num2ascii(r_date[4]);
                                 RS_CLCD <= 1;
                                 RW_CLCD <= 0;
                                 valid_CLCD <= 1;
@@ -390,7 +416,7 @@ module system_control(
                         end
                         14'b00_0000_0001_1111: begin
                             if(!r_flag_CLCD && !r_end_write[5])begin
-                                data_CLCD <= f_hex2ascii(r_date[5]);
+                                data_CLCD <= f_num2ascii(r_date[5]);
                                 RS_CLCD <= 1;
                                 RW_CLCD <= 0;
                                 valid_CLCD <= 1;
@@ -406,7 +432,7 @@ module system_control(
                         end
                         14'b00_0000_0011_1111: begin
                             if(!r_flag_CLCD && !r_end_write[6])begin
-                                data_CLCD <= f_hex2ascii(r_date[6]);
+                                data_CLCD <= f_num2ascii(r_date[6]);
                                 RS_CLCD <= 1;
                                 RW_CLCD <= 0;
                                 valid_CLCD <= 1;
@@ -422,7 +448,7 @@ module system_control(
                         end
                         14'b00_0000_0111_1111: begin
                             if(!r_flag_CLCD && !r_end_write[7])begin
-                                data_CLCD <= f_hex2ascii(r_date[7]);
+                                data_CLCD <= f_num2ascii(r_date[7]);
                                 RS_CLCD <= 1;
                                 RW_CLCD <= 0;
                                 valid_CLCD <= 1;
@@ -438,7 +464,7 @@ module system_control(
                         end
                         14'b00_0000_1111_1111: begin
                             if(!r_flag_CLCD && !r_end_write[8])begin
-                                data_CLCD <= f_hex2ascii(r_date[8]);
+                                data_CLCD <= f_num2ascii(r_date[8]);
                                 RS_CLCD <= 1;
                                 RW_CLCD <= 0;
                                 valid_CLCD <= 1;
@@ -454,7 +480,7 @@ module system_control(
                         end
                         14'b00_0001_1111_1111: begin
                             if(!r_flag_CLCD && !r_end_write[9])begin
-                                data_CLCD <= f_hex2ascii(r_date[9]);
+                                data_CLCD <= f_num2ascii(r_date[9]);
                                 RS_CLCD <= 1;
                                 RW_CLCD <= 0;
                                 valid_CLCD <= 1;
@@ -470,7 +496,7 @@ module system_control(
                         end
                         14'b00_0011_1111_1111: begin
                             if(!r_flag_CLCD && !r_end_write[10])begin
-                                data_CLCD <= f_hex2ascii(r_date[10]);
+                                data_CLCD <= f_num2ascii(r_date[10]);
                                 RS_CLCD <= 1;
                                 RW_CLCD <= 0;
                                 valid_CLCD <= 1;
@@ -486,7 +512,7 @@ module system_control(
                         end
                         14'b00_0111_1111_1111: begin
                             if(!r_flag_CLCD && !r_end_write[11])begin
-                                data_CLCD <= f_hex2ascii(r_date[11]);
+                                data_CLCD <= f_num2ascii(r_date[11]);
                                 RS_CLCD <= 1;
                                 RW_CLCD <= 0;
                                 valid_CLCD <= 1;
@@ -502,7 +528,7 @@ module system_control(
                         end
                         14'b00_1111_1111_1111: begin
                             if(!r_flag_CLCD && !r_end_write[12])begin
-                                data_CLCD <= f_hex2ascii(r_date[12]);
+                                data_CLCD <= f_num2ascii(r_date[12]);
                                 RS_CLCD <= 1;
                                 RW_CLCD <= 0;
                                 valid_CLCD <= 1;
@@ -518,7 +544,252 @@ module system_control(
                         end
                         14'b01_1111_1111_1111: begin
                             if(!r_flag_CLCD && !r_end_write[13])begin
-                                data_CLCD <= f_hex2ascii(r_date[13]);
+                                data_CLCD <= f_num2ascii(r_date[13]);
+                                RS_CLCD <= 1;
+                                RW_CLCD <= 0;
+                                valid_CLCD <= 1;
+                                r_flag_CLCD <= 1;
+                            end
+                            else if(w_busy_CLCD_pedge)begin
+                                valid_CLCD <= 0;
+                            end
+                            else if (w_busy_CLCD_nedge) begin
+                                r_end_write[13] <= 1;
+                                r_flag_CLCD <= 0;
+                            end
+                        end
+                    endcase
+                end
+                S_CHANGE_LINE: begin
+                    if(!r_flag_CLCD && !r_end_change_line) begin
+                        data_CLCD <= 8'b1100_0000;
+                        RS_CLCD <= 0;
+                        RW_CLCD <= 0;
+                        valid_CLCD <= 1;
+                        r_flag_CLCD <= 1;
+                        r_end_write <= 0;
+                    end
+                    else if (w_busy_CLCD_pedge) begin
+                        valid_CLCD <= 0;
+                    end
+                    else if(w_busy_CLCD_nedge) begin
+                        r_flag_CLCD <= 0;
+                        r_end_change_line <= 1;
+                    end
+                end
+                S_WRITE_SETTING: begin
+                    case (r_end_write)
+                        14'b00_0000_0000_0000: begin
+                            if(!r_flag_CLCD && !r_end_write[0])begin
+                                data_CLCD <= f_hex2ascii(ASCII_A);
+                                RS_CLCD <= 1;
+                                RW_CLCD <= 0;
+                                valid_CLCD <= 1;
+                                r_flag_CLCD <= 1;
+                            end
+                            else if(w_busy_CLCD_pedge)begin
+                                valid_CLCD <= 0;
+                            end
+                            else if (w_busy_CLCD_nedge) begin
+                                r_end_write[0] <= 1;
+                                r_flag_CLCD <= 0;
+                            end
+                        end 
+                        14'b00_0000_0000_0001: begin
+                            if(!r_flag_CLCD && !r_end_write[1])begin
+                                data_CLCD <= f_hex2ascii(ASCII_C);
+                                RS_CLCD <= 1;
+                                RW_CLCD <= 0;
+                                valid_CLCD <= 1;
+                                r_flag_CLCD <= 1;
+                            end
+                            else if(w_busy_CLCD_pedge)begin
+                                valid_CLCD <= 0;
+                            end
+                            else if (w_busy_CLCD_nedge) begin
+                                r_end_write[1] <= 1;
+                                r_flag_CLCD <= 0;
+                            end
+                        end
+                        14'b00_0000_0000_0011: begin
+                            if(!r_flag_CLCD && !r_end_write[2])begin
+                                data_CLCD <= f_hex2ascii(ASCII_E);
+                                RS_CLCD <= 1;
+                                RW_CLCD <= 0;
+                                valid_CLCD <= 1;
+                                r_flag_CLCD <= 1;
+                            end
+                            else if(w_busy_CLCD_pedge)begin
+                                valid_CLCD <= 0;
+                            end
+                            else if (w_busy_CLCD_nedge) begin
+                                r_end_write[2] <= 1;
+                                r_flag_CLCD <= 0;
+                            end
+                        end
+                        14'b00_0000_0000_0111: begin
+                            if(!r_flag_CLCD && !r_end_write[3])begin
+                                data_CLCD <= f_hex2ascii(ASCII_EMPTY);
+                                RS_CLCD <= 1;
+                                RW_CLCD <= 0;
+                                valid_CLCD <= 1;
+                                r_flag_CLCD <= 1;
+                            end
+                            else if(w_busy_CLCD_pedge)begin
+                                valid_CLCD <= 0;
+                            end
+                            else if (w_busy_CLCD_nedge) begin
+                                r_end_write[3] <= 1;
+                                r_flag_CLCD <= 0;
+                            end
+                        end
+                        14'b00_0000_0000_1111: begin
+                            if(!r_flag_CLCD && !r_end_write[4])begin
+                                data_CLCD <= f_hex2ascii(ASCII_H);
+                                RS_CLCD <= 1;
+                                RW_CLCD <= 0;
+                                valid_CLCD <= 1;
+                                r_flag_CLCD <= 1;
+                            end
+                            else if(w_busy_CLCD_pedge)begin
+                                valid_CLCD <= 0;
+                            end
+                            else if (w_busy_CLCD_nedge) begin
+                                r_end_write[4] <= 1;
+                                r_flag_CLCD <= 0;
+                            end
+                        end
+                        14'b00_0000_0001_1111: begin
+                            if(!r_flag_CLCD && !r_end_write[5])begin
+                                data_CLCD <= f_hex2ascii(ASCII_I);
+                                RS_CLCD <= 1;
+                                RW_CLCD <= 0;
+                                valid_CLCD <= 1;
+                                r_flag_CLCD <= 1;
+                            end
+                            else if(w_busy_CLCD_pedge)begin
+                                valid_CLCD <= 0;
+                            end
+                            else if (w_busy_CLCD_nedge) begin
+                                r_end_write[5] <= 1;
+                                r_flag_CLCD <= 0;
+                            end
+                        end
+                        14'b00_0000_0011_1111: begin
+                            if(!r_flag_CLCD && !r_end_write[6])begin
+                                data_CLCD <= f_hex2ascii(ASCII_M);
+                                RS_CLCD <= 1;
+                                RW_CLCD <= 0;
+                                valid_CLCD <= 1;
+                                r_flag_CLCD <= 1;
+                            end
+                            else if(w_busy_CLCD_pedge)begin
+                                valid_CLCD <= 0;
+                            end
+                            else if (w_busy_CLCD_nedge) begin
+                                r_end_write[6] <= 1;
+                                r_flag_CLCD <= 0;
+                            end
+                        end
+                        14'b00_0000_0111_1111: begin
+                            if(!r_flag_CLCD && !r_end_write[7])begin
+                                data_CLCD <= f_hex2ascii(ASCII_N);
+                                RS_CLCD <= 1;
+                                RW_CLCD <= 0;
+                                valid_CLCD <= 1;
+                                r_flag_CLCD <= 1;
+                            end
+                            else if(w_busy_CLCD_pedge)begin
+                                valid_CLCD <= 0;
+                            end
+                            else if (w_busy_CLCD_nedge) begin
+                                r_end_write[7] <= 1;
+                                r_flag_CLCD <= 0;
+                            end
+                        end
+                        14'b00_0000_1111_1111: begin
+                            if(!r_flag_CLCD && !r_end_write[8])begin
+                                data_CLCD <= f_hex2ascii(ASCII_O);
+                                RS_CLCD <= 1;
+                                RW_CLCD <= 0;
+                                valid_CLCD <= 1;
+                                r_flag_CLCD <= 1;
+                            end
+                            else if(w_busy_CLCD_pedge)begin
+                                valid_CLCD <= 0;
+                            end
+                            else if (w_busy_CLCD_nedge) begin
+                                r_end_write[8] <= 1;
+                                r_flag_CLCD <= 0;
+                            end
+                        end
+                        14'b00_0001_1111_1111: begin
+                            if(!r_flag_CLCD && !r_end_write[9])begin
+                                data_CLCD <= f_hex2ascii(ASCII_R);
+                                RS_CLCD <= 1;
+                                RW_CLCD <= 0;
+                                valid_CLCD <= 1;
+                                r_flag_CLCD <= 1;
+                            end
+                            else if(w_busy_CLCD_pedge)begin
+                                valid_CLCD <= 0;
+                            end
+                            else if (w_busy_CLCD_nedge) begin
+                                r_end_write[9] <= 1;
+                                r_flag_CLCD <= 0;
+                            end
+                        end
+                        14'b00_0011_1111_1111: begin
+                            if(!r_flag_CLCD && !r_end_write[10])begin
+                                data_CLCD <= f_hex2ascii(ASCII_S);
+                                RS_CLCD <= 1;
+                                RW_CLCD <= 0;
+                                valid_CLCD <= 1;
+                                r_flag_CLCD <= 1;
+                            end
+                            else if(w_busy_CLCD_pedge)begin
+                                valid_CLCD <= 0;
+                            end
+                            else if (w_busy_CLCD_nedge) begin
+                                r_end_write[10] <= 1;
+                                r_flag_CLCD <= 0;
+                            end
+                        end
+                        14'b00_0111_1111_1111: begin
+                            if(!r_flag_CLCD && !r_end_write[11])begin
+                                data_CLCD <= f_hex2ascii(ASCII_T);
+                                RS_CLCD <= 1;
+                                RW_CLCD <= 0;
+                                valid_CLCD <= 1;
+                                r_flag_CLCD <= 1;
+                            end
+                            else if(w_busy_CLCD_pedge)begin
+                                valid_CLCD <= 0;
+                            end
+                            else if (w_busy_CLCD_nedge) begin
+                                r_end_write[11] <= 1;
+                                r_flag_CLCD <= 0;
+                            end
+                        end
+                        14'b00_1111_1111_1111: begin
+                            if(!r_flag_CLCD && !r_end_write[12])begin
+                                data_CLCD <= f_hex2ascii(ASCII_U);
+                                RS_CLCD <= 1;
+                                RW_CLCD <= 0;
+                                valid_CLCD <= 1;
+                                r_flag_CLCD <= 1;
+                            end
+                            else if(w_busy_CLCD_pedge)begin
+                                valid_CLCD <= 0;
+                            end
+                            else if (w_busy_CLCD_nedge) begin
+                                r_end_write[12] <= 1;
+                                r_flag_CLCD <= 0;
+                            end
+                        end
+                        14'b01_1111_1111_1111: begin
+                            if(!r_flag_CLCD && !r_end_write[13])begin
+                                data_CLCD <= f_hex2ascii(ASCII_Y);
                                 RS_CLCD <= 1;
                                 RW_CLCD <= 0;
                                 valid_CLCD <= 1;
