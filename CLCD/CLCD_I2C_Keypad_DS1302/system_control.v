@@ -2,6 +2,8 @@
 module system_control(
     input clk,
     input reset_p,
+    //debug
+    input [2:0] sw,
     //from i2c_reg
     input empty_reg,
     //btw DS1302
@@ -22,20 +24,28 @@ module system_control(
     //input valid_Keypad
     );
 
-    localparam ASCII_A = 00;
-    localparam ASCII_C = 01;
-    localparam ASCII_E = 02;
-    localparam ASCII_H = 03;
-    localparam ASCII_I = 04;
-    localparam ASCII_M = 05;
-    localparam ASCII_N = 06;
-    localparam ASCII_O = 07;
-    localparam ASCII_R = 08;
-    localparam ASCII_S = 09;
-    localparam ASCII_T = 10;
-    localparam ASCII_U = 11;
-    localparam ASCII_Y = 12;
-    localparam ASCII_EMPTY = 13;
+    localparam TIME_YEAR =  01;
+    localparam TIME_MONTH = 02;
+    localparam TIME_DAY =   03;
+    localparam TIME_HOUR =  04;
+    localparam TIME_MIN =   05;
+    localparam TIME_SEC =   06;
+
+    localparam ASCII_A =        00;
+    localparam ASCII_C =        01;
+    localparam ASCII_D =        02;
+    localparam ASCII_E =        03;
+    localparam ASCII_H =        04;
+    localparam ASCII_I =        05;
+    localparam ASCII_M =        06;
+    localparam ASCII_N =        07;
+    localparam ASCII_O =        08;
+    localparam ASCII_R =        09;
+    localparam ASCII_S =        10;
+    localparam ASCII_T =        11;
+    localparam ASCII_U =        12;
+    localparam ASCII_Y =        13;
+    localparam ASCII_EMPTY =    14;
 
     localparam S_INITIAL =          00;
     localparam S_IDLE =             01;
@@ -82,24 +92,63 @@ module system_control(
         endcase
     endfunction
 
-    function [7:0] f_hex2ascii;
-        input [3:0] hex;
-        case (hex)
-            ASCII_A: f_hex2ascii = 8'h41;
-            ASCII_C: f_hex2ascii = 8'h43;
-            ASCII_E: f_hex2ascii = 8'h45;
-            ASCII_H: f_hex2ascii = 8'h48;
-            ASCII_I: f_hex2ascii = 8'h49;
-            ASCII_M: f_hex2ascii = 8'h4d;
-            ASCII_N: f_hex2ascii = 8'h4e;
-            ASCII_O: f_hex2ascii = 8'h4f;
-            ASCII_R: f_hex2ascii = 8'h52;
-            ASCII_S: f_hex2ascii = 8'h53;
-            ASCII_T: f_hex2ascii = 8'h54;
-            ASCII_U: f_hex2ascii = 8'h55;
-            ASCII_Y: f_hex2ascii = 8'h59;
-            ASCII_EMPTY: f_hex2ascii = 8'h20;
-            default: f_hex2ascii = 8'h21;
+    function [7:0] f_alphabet2ascii;
+        input [3:0] alphabet;
+        case (alphabet)
+            ASCII_A: f_alphabet2ascii = 8'h41;
+            ASCII_C: f_alphabet2ascii = 8'h43;
+            ASCII_D: f_alphabet2ascii = 8'h44;
+            ASCII_E: f_alphabet2ascii = 8'h45;
+            ASCII_H: f_alphabet2ascii = 8'h48;
+            ASCII_I: f_alphabet2ascii = 8'h49;
+            ASCII_M: f_alphabet2ascii = 8'h4d;
+            ASCII_N: f_alphabet2ascii = 8'h4e;
+            ASCII_O: f_alphabet2ascii = 8'h4f;
+            ASCII_R: f_alphabet2ascii = 8'h52;
+            ASCII_S: f_alphabet2ascii = 8'h53;
+            ASCII_T: f_alphabet2ascii = 8'h54;
+            ASCII_U: f_alphabet2ascii = 8'h55;
+            ASCII_Y: f_alphabet2ascii = 8'h59;
+            ASCII_EMPTY: f_alphabet2ascii = 8'h20;
+            default: f_alphabet2ascii = 8'h21;
+        endcase
+    endfunction
+
+    function [3:0] f_time2alphabet;
+        input [2:0] tim;
+        input [2:0] order;
+        case ({tim, order})
+            {TIME_YEAR, 3'd1}: f_time2alphabet = ASCII_Y;
+            {TIME_YEAR, 3'd2}: f_time2alphabet = ASCII_E;
+            {TIME_YEAR, 3'd3}: f_time2alphabet = ASCII_A;
+            {TIME_YEAR, 3'd4}: f_time2alphabet = ASCII_R;
+            {TIME_YEAR, 3'd5}: f_time2alphabet = ASCII_EMPTY;
+            {TIME_MONTH, 3'd1}: f_time2alphabet = ASCII_M;
+            {TIME_MONTH, 3'd2}: f_time2alphabet = ASCII_O;
+            {TIME_MONTH, 3'd3}: f_time2alphabet = ASCII_N;
+            {TIME_MONTH, 3'd4}: f_time2alphabet = ASCII_T;
+            {TIME_MONTH, 3'd5}: f_time2alphabet = ASCII_H;
+            {TIME_DAY, 3'd1}: f_time2alphabet = ASCII_D;
+            {TIME_DAY, 3'd2}: f_time2alphabet = ASCII_A;
+            {TIME_DAY, 3'd3}: f_time2alphabet = ASCII_Y;
+            {TIME_DAY, 3'd4}: f_time2alphabet = ASCII_EMPTY;
+            {TIME_DAY, 3'd5}: f_time2alphabet = ASCII_EMPTY;
+            {TIME_HOUR, 3'd1}: f_time2alphabet = ASCII_H;
+            {TIME_HOUR, 3'd2}: f_time2alphabet = ASCII_O;
+            {TIME_HOUR, 3'd3}: f_time2alphabet = ASCII_U;
+            {TIME_HOUR, 3'd4}: f_time2alphabet = ASCII_R;
+            {TIME_HOUR, 3'd5}: f_time2alphabet = ASCII_EMPTY;
+            {TIME_MIN, 3'd1}: f_time2alphabet = ASCII_M;
+            {TIME_MIN, 3'd2}: f_time2alphabet = ASCII_I;
+            {TIME_MIN, 3'd3}: f_time2alphabet = ASCII_N;
+            {TIME_MIN, 3'd4}: f_time2alphabet = ASCII_EMPTY;
+            {TIME_MIN, 3'd5}: f_time2alphabet = ASCII_EMPTY;
+            {TIME_SEC, 3'd1}: f_time2alphabet = ASCII_S;
+            {TIME_SEC, 3'd2}: f_time2alphabet = ASCII_E;
+            {TIME_SEC, 3'd3}: f_time2alphabet = ASCII_C;
+            {TIME_SEC, 3'd4}: f_time2alphabet = ASCII_EMPTY;
+            {TIME_SEC, 3'd5}: f_time2alphabet = ASCII_EMPTY;
+            default: f_time2alphabet = ASCII_A;
         endcase
     endfunction
 
@@ -317,6 +366,7 @@ module system_control(
             valid_CLCD <= 0;
             r_flag_CLCD <= 0;
             r_end_write <= 14'h0;
+            r_end_change_line <= 0;
             r_end_return <= 0;
         end else begin
             case (r_state)
@@ -324,6 +374,7 @@ module system_control(
                     valid_CLCD <= 0;
                     r_flag_CLCD <= 0;
                     r_end_write <= 14'h0;
+                    r_end_change_line <= 0;
                     r_end_return <= 0;
                 end 
                 S_IDLE: begin
@@ -581,7 +632,7 @@ module system_control(
                     case (r_end_write)
                         14'b00_0000_0000_0000: begin
                             if(!r_flag_CLCD && !r_end_write[0])begin
-                                data_CLCD <= f_hex2ascii(ASCII_A);
+                                data_CLCD <= f_alphabet2ascii(f_time2alphabet(sw, 1));
                                 RS_CLCD <= 1;
                                 RW_CLCD <= 0;
                                 valid_CLCD <= 1;
@@ -597,7 +648,7 @@ module system_control(
                         end 
                         14'b00_0000_0000_0001: begin
                             if(!r_flag_CLCD && !r_end_write[1])begin
-                                data_CLCD <= f_hex2ascii(ASCII_C);
+                                data_CLCD <= f_alphabet2ascii(f_time2alphabet(sw, 2));
                                 RS_CLCD <= 1;
                                 RW_CLCD <= 0;
                                 valid_CLCD <= 1;
@@ -613,7 +664,7 @@ module system_control(
                         end
                         14'b00_0000_0000_0011: begin
                             if(!r_flag_CLCD && !r_end_write[2])begin
-                                data_CLCD <= f_hex2ascii(ASCII_E);
+                                data_CLCD <= f_alphabet2ascii(f_time2alphabet(sw, 3));
                                 RS_CLCD <= 1;
                                 RW_CLCD <= 0;
                                 valid_CLCD <= 1;
@@ -629,7 +680,7 @@ module system_control(
                         end
                         14'b00_0000_0000_0111: begin
                             if(!r_flag_CLCD && !r_end_write[3])begin
-                                data_CLCD <= f_hex2ascii(ASCII_EMPTY);
+                                data_CLCD <= f_alphabet2ascii(f_time2alphabet(sw, 4));
                                 RS_CLCD <= 1;
                                 RW_CLCD <= 0;
                                 valid_CLCD <= 1;
@@ -645,7 +696,7 @@ module system_control(
                         end
                         14'b00_0000_0000_1111: begin
                             if(!r_flag_CLCD && !r_end_write[4])begin
-                                data_CLCD <= f_hex2ascii(ASCII_H);
+                                data_CLCD <= f_alphabet2ascii(f_time2alphabet(sw, 5));
                                 RS_CLCD <= 1;
                                 RW_CLCD <= 0;
                                 valid_CLCD <= 1;
@@ -661,7 +712,7 @@ module system_control(
                         end
                         14'b00_0000_0001_1111: begin
                             if(!r_flag_CLCD && !r_end_write[5])begin
-                                data_CLCD <= f_hex2ascii(ASCII_I);
+                                data_CLCD <= f_alphabet2ascii(ASCII_EMPTY);
                                 RS_CLCD <= 1;
                                 RW_CLCD <= 0;
                                 valid_CLCD <= 1;
@@ -677,7 +728,7 @@ module system_control(
                         end
                         14'b00_0000_0011_1111: begin
                             if(!r_flag_CLCD && !r_end_write[6])begin
-                                data_CLCD <= f_hex2ascii(ASCII_M);
+                                data_CLCD <= f_alphabet2ascii(ASCII_EMPTY);
                                 RS_CLCD <= 1;
                                 RW_CLCD <= 0;
                                 valid_CLCD <= 1;
@@ -693,7 +744,7 @@ module system_control(
                         end
                         14'b00_0000_0111_1111: begin
                             if(!r_flag_CLCD && !r_end_write[7])begin
-                                data_CLCD <= f_hex2ascii(ASCII_N);
+                                data_CLCD <= f_alphabet2ascii(ASCII_EMPTY);
                                 RS_CLCD <= 1;
                                 RW_CLCD <= 0;
                                 valid_CLCD <= 1;
@@ -709,7 +760,7 @@ module system_control(
                         end
                         14'b00_0000_1111_1111: begin
                             if(!r_flag_CLCD && !r_end_write[8])begin
-                                data_CLCD <= f_hex2ascii(ASCII_O);
+                                data_CLCD <= f_alphabet2ascii(ASCII_EMPTY);
                                 RS_CLCD <= 1;
                                 RW_CLCD <= 0;
                                 valid_CLCD <= 1;
@@ -725,7 +776,7 @@ module system_control(
                         end
                         14'b00_0001_1111_1111: begin
                             if(!r_flag_CLCD && !r_end_write[9])begin
-                                data_CLCD <= f_hex2ascii(ASCII_R);
+                                data_CLCD <= f_alphabet2ascii(ASCII_EMPTY);
                                 RS_CLCD <= 1;
                                 RW_CLCD <= 0;
                                 valid_CLCD <= 1;
@@ -741,7 +792,7 @@ module system_control(
                         end
                         14'b00_0011_1111_1111: begin
                             if(!r_flag_CLCD && !r_end_write[10])begin
-                                data_CLCD <= f_hex2ascii(ASCII_S);
+                                data_CLCD <= f_alphabet2ascii(ASCII_EMPTY);
                                 RS_CLCD <= 1;
                                 RW_CLCD <= 0;
                                 valid_CLCD <= 1;
@@ -757,7 +808,7 @@ module system_control(
                         end
                         14'b00_0111_1111_1111: begin
                             if(!r_flag_CLCD && !r_end_write[11])begin
-                                data_CLCD <= f_hex2ascii(ASCII_T);
+                                data_CLCD <= f_alphabet2ascii(ASCII_EMPTY);
                                 RS_CLCD <= 1;
                                 RW_CLCD <= 0;
                                 valid_CLCD <= 1;
@@ -773,7 +824,7 @@ module system_control(
                         end
                         14'b00_1111_1111_1111: begin
                             if(!r_flag_CLCD && !r_end_write[12])begin
-                                data_CLCD <= f_hex2ascii(ASCII_U);
+                                data_CLCD <= f_alphabet2ascii(ASCII_EMPTY);
                                 RS_CLCD <= 1;
                                 RW_CLCD <= 0;
                                 valid_CLCD <= 1;
@@ -789,7 +840,7 @@ module system_control(
                         end
                         14'b01_1111_1111_1111: begin
                             if(!r_flag_CLCD && !r_end_write[13])begin
-                                data_CLCD <= f_hex2ascii(ASCII_Y);
+                                data_CLCD <= f_alphabet2ascii(ASCII_EMPTY);
                                 RS_CLCD <= 1;
                                 RW_CLCD <= 0;
                                 valid_CLCD <= 1;
