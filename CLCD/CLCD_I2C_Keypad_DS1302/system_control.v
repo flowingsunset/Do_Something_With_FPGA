@@ -2,13 +2,11 @@
 module system_control(
     input clk,
     input reset_p,
-    //debug
-    input [2:0] sw,
     //from i2c_reg
     input empty_reg,
     //btw DS1302
     output reg [7:0] addr_RTC,
-    //output reg [7:0] data_RTC,    //not use this time
+    output reg [7:0] data_RTC,
     output reg valid_RTC,
     input busy_RTC,
     input [7:0] receive_RTC,
@@ -17,11 +15,11 @@ module system_control(
     output reg RS_CLCD,
     output reg RW_CLCD,
     output reg valid_CLCD,
-    input busy_CLCD
+    input busy_CLCD,
     //input [7:0] receive_I2C,  //not use this time
     //btw Keypad
-    //input [3:0] data_Keypad,
-    //input valid_Keypad
+    input [3:0] data_Keypad,
+    input valid_Keypad
     );
 
     localparam TIME_YEAR =  01;
@@ -59,12 +57,14 @@ module system_control(
     localparam S_CHANGE_LINE =      09;
     localparam S_WRITE_SETTING =    10;
     localparam S_RETURN_HOME =      11;
+    localparam S_CHANGE_TIME =      12;
 
     //signal regsiter for FSM
     reg [3:0] r_state, r_next_state;
     reg r_end_read_year, r_end_read_month, r_end_read_day, r_end_read_hour, r_end_read_minute, r_end_read_second;
     reg [13:0] r_end_write;
     reg r_end_change_line;
+    reg r_end_change_time;
     reg r_end_return;
 
     //signal register for RTC
@@ -73,6 +73,11 @@ module system_control(
 
     //date register
     reg [3:0] r_date [13:0];
+
+    //keypad register
+    reg [3:0] r_data_keypad [1:0];
+    reg [2:0] r_setting;
+    reg r_change_time;
 
 
     function [7:0] f_num2ascii;
@@ -114,41 +119,54 @@ module system_control(
         endcase
     endfunction
 
-    function [3:0] f_time2alphabet;
+    function [7:0] f_time2ascii;
         input [2:0] tim;
         input [2:0] order;
         case ({tim, order})
-            {TIME_YEAR, 3'd1}: f_time2alphabet = ASCII_Y;
-            {TIME_YEAR, 3'd2}: f_time2alphabet = ASCII_E;
-            {TIME_YEAR, 3'd3}: f_time2alphabet = ASCII_A;
-            {TIME_YEAR, 3'd4}: f_time2alphabet = ASCII_R;
-            {TIME_YEAR, 3'd5}: f_time2alphabet = ASCII_EMPTY;
-            {TIME_MONTH, 3'd1}: f_time2alphabet = ASCII_M;
-            {TIME_MONTH, 3'd2}: f_time2alphabet = ASCII_O;
-            {TIME_MONTH, 3'd3}: f_time2alphabet = ASCII_N;
-            {TIME_MONTH, 3'd4}: f_time2alphabet = ASCII_T;
-            {TIME_MONTH, 3'd5}: f_time2alphabet = ASCII_H;
-            {TIME_DAY, 3'd1}: f_time2alphabet = ASCII_D;
-            {TIME_DAY, 3'd2}: f_time2alphabet = ASCII_A;
-            {TIME_DAY, 3'd3}: f_time2alphabet = ASCII_Y;
-            {TIME_DAY, 3'd4}: f_time2alphabet = ASCII_EMPTY;
-            {TIME_DAY, 3'd5}: f_time2alphabet = ASCII_EMPTY;
-            {TIME_HOUR, 3'd1}: f_time2alphabet = ASCII_H;
-            {TIME_HOUR, 3'd2}: f_time2alphabet = ASCII_O;
-            {TIME_HOUR, 3'd3}: f_time2alphabet = ASCII_U;
-            {TIME_HOUR, 3'd4}: f_time2alphabet = ASCII_R;
-            {TIME_HOUR, 3'd5}: f_time2alphabet = ASCII_EMPTY;
-            {TIME_MIN, 3'd1}: f_time2alphabet = ASCII_M;
-            {TIME_MIN, 3'd2}: f_time2alphabet = ASCII_I;
-            {TIME_MIN, 3'd3}: f_time2alphabet = ASCII_N;
-            {TIME_MIN, 3'd4}: f_time2alphabet = ASCII_EMPTY;
-            {TIME_MIN, 3'd5}: f_time2alphabet = ASCII_EMPTY;
-            {TIME_SEC, 3'd1}: f_time2alphabet = ASCII_S;
-            {TIME_SEC, 3'd2}: f_time2alphabet = ASCII_E;
-            {TIME_SEC, 3'd3}: f_time2alphabet = ASCII_C;
-            {TIME_SEC, 3'd4}: f_time2alphabet = ASCII_EMPTY;
-            {TIME_SEC, 3'd5}: f_time2alphabet = ASCII_EMPTY;
-            default: f_time2alphabet = ASCII_A;
+            {TIME_YEAR, 3'd1}: f_time2ascii = f_alphabet2ascii(ASCII_Y);
+            {TIME_YEAR, 3'd2}: f_time2ascii = f_alphabet2ascii(ASCII_E);
+            {TIME_YEAR, 3'd3}: f_time2ascii = f_alphabet2ascii(ASCII_A);
+            {TIME_YEAR, 3'd4}: f_time2ascii = f_alphabet2ascii(ASCII_R);
+            {TIME_YEAR, 3'd5}: f_time2ascii = f_alphabet2ascii(ASCII_EMPTY);
+            {TIME_MONTH, 3'd1}: f_time2ascii = f_alphabet2ascii(ASCII_M);
+            {TIME_MONTH, 3'd2}: f_time2ascii = f_alphabet2ascii(ASCII_O);
+            {TIME_MONTH, 3'd3}: f_time2ascii = f_alphabet2ascii(ASCII_N);
+            {TIME_MONTH, 3'd4}: f_time2ascii = f_alphabet2ascii(ASCII_T);
+            {TIME_MONTH, 3'd5}: f_time2ascii = f_alphabet2ascii(ASCII_H);
+            {TIME_DAY, 3'd1}: f_time2ascii = f_alphabet2ascii(ASCII_D);
+            {TIME_DAY, 3'd2}: f_time2ascii = f_alphabet2ascii(ASCII_A);
+            {TIME_DAY, 3'd3}: f_time2ascii = f_alphabet2ascii(ASCII_Y);
+            {TIME_DAY, 3'd4}: f_time2ascii = f_alphabet2ascii(ASCII_EMPTY);
+            {TIME_DAY, 3'd5}: f_time2ascii = f_alphabet2ascii(ASCII_EMPTY);
+            {TIME_HOUR, 3'd1}: f_time2ascii = f_alphabet2ascii(ASCII_H);
+            {TIME_HOUR, 3'd2}: f_time2ascii = f_alphabet2ascii(ASCII_O);
+            {TIME_HOUR, 3'd3}: f_time2ascii = f_alphabet2ascii(ASCII_U);
+            {TIME_HOUR, 3'd4}: f_time2ascii = f_alphabet2ascii(ASCII_R);
+            {TIME_HOUR, 3'd5}: f_time2ascii = f_alphabet2ascii(ASCII_EMPTY);
+            {TIME_MIN, 3'd1}: f_time2ascii = f_alphabet2ascii(ASCII_M);
+            {TIME_MIN, 3'd2}: f_time2ascii = f_alphabet2ascii(ASCII_I);
+            {TIME_MIN, 3'd3}: f_time2ascii = f_alphabet2ascii(ASCII_N);
+            {TIME_MIN, 3'd4}: f_time2ascii = f_alphabet2ascii(ASCII_EMPTY);
+            {TIME_MIN, 3'd5}: f_time2ascii = f_alphabet2ascii(ASCII_EMPTY);
+            {TIME_SEC, 3'd1}: f_time2ascii = f_alphabet2ascii(ASCII_S);
+            {TIME_SEC, 3'd2}: f_time2ascii = f_alphabet2ascii(ASCII_E);
+            {TIME_SEC, 3'd3}: f_time2ascii = f_alphabet2ascii(ASCII_C);
+            {TIME_SEC, 3'd4}: f_time2ascii = f_alphabet2ascii(ASCII_EMPTY);
+            {TIME_SEC, 3'd5}: f_time2ascii = f_alphabet2ascii(ASCII_EMPTY);
+            default: f_time2ascii = f_alphabet2ascii(ASCII_EMPTY);
+        endcase
+    endfunction
+
+    function [7:0] f_time2RTCaddr;
+        input [2:0] tim;
+        case (tim)
+            TIME_YEAR: f_time2RTCaddr = 8'h8c;
+            TIME_MONTH: f_time2RTCaddr = 8'h88;
+            TIME_DAY: f_time2RTCaddr = 8'h86;
+            TIME_HOUR: f_time2RTCaddr = 8'h84;
+            TIME_MIN: f_time2RTCaddr = 8'h82;
+            TIME_SEC: f_time2RTCaddr = 8'h80;
+            default: f_time2RTCaddr = 8'h00;
         endcase
     endfunction
 
@@ -159,6 +177,8 @@ module system_control(
     edge_detector_n edp0(.clk(clk), .cp_in(busy_RTC),.reset_p(reset_p), .p_edge(w_busy_RTC_pedge), .n_edge(w_busy_RTC_nedge));
     wire w_busy_CLCD_pedge, w_busy_CLCD_nedge;
     edge_detector_n edp1(.clk(clk), .cp_in(busy_CLCD),.reset_p(reset_p), .p_edge(w_busy_CLCD_pedge), .n_edge(w_busy_CLCD_nedge));
+    wire w_valid_Keypad_pedge;
+    edge_detector_n edp2(.clk(clk), .cp_in(valid_Keypad),.reset_p(reset_p), .p_edge(w_valid_Keypad_pedge), .n_edge());
 
     //state
     always @(posedge clk) begin
@@ -181,7 +201,8 @@ module system_control(
                     else r_next_state = S_INITIAL;
                 end
                 S_IDLE: begin
-                    r_next_state = S_READ_YEAR;
+                    if(r_change_time) r_next_state = S_CHANGE_TIME;
+                    else r_next_state = S_READ_YEAR;
                 end
                 S_READ_YEAR: begin
                     if(r_end_read_year) r_next_state = S_READ_MONTH;
@@ -223,6 +244,10 @@ module system_control(
                     if(r_end_return) r_next_state = S_IDLE;
                     else r_next_state = S_RETURN_HOME;
                 end
+                S_CHANGE_TIME: begin
+                    if(r_end_change_time) r_next_state = S_IDLE;
+                    else r_next_state = S_CHANGE_TIME;
+                end
             endcase
         end
     end
@@ -230,12 +255,15 @@ module system_control(
     //control DS1302
     always @(posedge clk ) begin
         if (reset_p) begin
+            addr_RTC <= 0;
+            data_RTC <= 0;
             r_end_read_year <= 0;
             r_end_read_month <= 0;
             r_end_read_day <= 0;
             r_end_read_hour <= 0;
             r_end_read_minute <= 0;
             r_end_read_second <= 0;
+            r_end_change_time <= 0;
             r_flag_RTC <= 0;
             r_date[0] <= 2;
             r_date[1] <= 0;
@@ -248,6 +276,7 @@ module system_control(
                     r_end_read_hour <= 0;
                     r_end_read_minute <= 0;
                     r_end_read_second <= 0;
+                    r_end_change_time <= 0;
                 end 
                 S_IDLE: begin
                     r_end_read_year <= 0;
@@ -256,6 +285,7 @@ module system_control(
                     r_end_read_hour <= 0;
                     r_end_read_minute <= 0;
                     r_end_read_second <= 0;
+                    r_end_change_time <= 0;
                 end 
                 S_READ_YEAR: begin
                     if(!r_flag_RTC && !r_end_read_year) begin
@@ -353,6 +383,20 @@ module system_control(
                         r_flag_RTC <= 0;
                     end
                 end
+                S_CHANGE_TIME: begin
+                    if (!r_flag_RTC && !r_end_change_time) begin
+                        addr_RTC <= f_time2RTCaddr(r_setting);
+                        data_RTC <= {r_data_keypad[1], r_data_keypad[0]};
+                        valid_RTC <= 1;
+                        r_flag_RTC <= 1;
+                    end else if(w_busy_RTC_pedge)begin
+                        valid_RTC <= 0;
+                    end
+                    else if(w_busy_RTC_nedge)begin
+                        r_end_change_time <= 1;
+                        r_flag_RTC <= 0;
+                    end
+                end
             endcase
         end
     end
@@ -381,6 +425,7 @@ module system_control(
                     valid_CLCD <= 0;
                     r_flag_CLCD <= 0;
                     r_end_write <= 14'h0;
+                    r_end_change_line <= 0;
                     r_end_return <= 0;
                 end 
                 S_WRITE_TIME: begin
@@ -618,7 +663,7 @@ module system_control(
                         RW_CLCD <= 0;
                         valid_CLCD <= 1;
                         r_flag_CLCD <= 1;
-                        r_end_write <= 0;
+                        r_end_write <= 14'h0;
                     end
                     else if (w_busy_CLCD_pedge) begin
                         valid_CLCD <= 0;
@@ -632,7 +677,7 @@ module system_control(
                     case (r_end_write)
                         14'b00_0000_0000_0000: begin
                             if(!r_flag_CLCD && !r_end_write[0])begin
-                                data_CLCD <= f_alphabet2ascii(f_time2alphabet(sw, 1));
+                                data_CLCD <= f_time2ascii(r_setting, 1);
                                 RS_CLCD <= 1;
                                 RW_CLCD <= 0;
                                 valid_CLCD <= 1;
@@ -648,7 +693,7 @@ module system_control(
                         end 
                         14'b00_0000_0000_0001: begin
                             if(!r_flag_CLCD && !r_end_write[1])begin
-                                data_CLCD <= f_alphabet2ascii(f_time2alphabet(sw, 2));
+                                data_CLCD <= f_time2ascii(r_setting, 2);
                                 RS_CLCD <= 1;
                                 RW_CLCD <= 0;
                                 valid_CLCD <= 1;
@@ -664,7 +709,7 @@ module system_control(
                         end
                         14'b00_0000_0000_0011: begin
                             if(!r_flag_CLCD && !r_end_write[2])begin
-                                data_CLCD <= f_alphabet2ascii(f_time2alphabet(sw, 3));
+                                data_CLCD <= f_time2ascii(r_setting, 3);
                                 RS_CLCD <= 1;
                                 RW_CLCD <= 0;
                                 valid_CLCD <= 1;
@@ -680,7 +725,7 @@ module system_control(
                         end
                         14'b00_0000_0000_0111: begin
                             if(!r_flag_CLCD && !r_end_write[3])begin
-                                data_CLCD <= f_alphabet2ascii(f_time2alphabet(sw, 4));
+                                data_CLCD <= f_time2ascii(r_setting, 4);
                                 RS_CLCD <= 1;
                                 RW_CLCD <= 0;
                                 valid_CLCD <= 1;
@@ -696,7 +741,7 @@ module system_control(
                         end
                         14'b00_0000_0000_1111: begin
                             if(!r_flag_CLCD && !r_end_write[4])begin
-                                data_CLCD <= f_alphabet2ascii(f_time2alphabet(sw, 5));
+                                data_CLCD <= f_time2ascii(r_setting, 5);
                                 RS_CLCD <= 1;
                                 RW_CLCD <= 0;
                                 valid_CLCD <= 1;
@@ -824,7 +869,7 @@ module system_control(
                         end
                         14'b00_1111_1111_1111: begin
                             if(!r_flag_CLCD && !r_end_write[12])begin
-                                data_CLCD <= f_alphabet2ascii(ASCII_EMPTY);
+                                data_CLCD <= f_num2ascii(r_data_keypad[1]);
                                 RS_CLCD <= 1;
                                 RW_CLCD <= 0;
                                 valid_CLCD <= 1;
@@ -840,7 +885,7 @@ module system_control(
                         end
                         14'b01_1111_1111_1111: begin
                             if(!r_flag_CLCD && !r_end_write[13])begin
-                                data_CLCD <= f_alphabet2ascii(ASCII_EMPTY);
+                                data_CLCD <= f_num2ascii(r_data_keypad[0]);
                                 RS_CLCD <= 1;
                                 RW_CLCD <= 0;
                                 valid_CLCD <= 1;
@@ -876,5 +921,86 @@ module system_control(
         end
     end
 
+    //control Keypad
+    always @(posedge clk) begin
+        if (reset_p) begin
+            r_data_keypad[0] <= 0;
+            r_data_keypad[1] <= 0;
+            r_setting <= 0;
+            r_change_time <= 0;
+        end else begin
+            if (r_state == S_CHANGE_TIME) begin
+                r_change_time <= 0;
+            end
+            if(w_valid_Keypad_pedge) begin
+                case (data_Keypad)
+                    4'h0: begin
+                        r_data_keypad[0] <= 4'h7;
+                        r_data_keypad[1] <= r_data_keypad[0];
+                    end 
+                    4'h1: begin
+                        r_data_keypad[0] <= 4'h8;
+                        r_data_keypad[1] <= r_data_keypad[0];
+                    end
+                    4'h2: begin
+                        r_data_keypad[0] <= 4'h9;
+                        r_data_keypad[1] <= r_data_keypad[0];
+                    end
+                    4'h3: begin
+                        if(r_setting>=6) r_setting <= 0;
+                        else r_setting <= r_setting + 1;
+                    end
+                    4'h4: begin
+                        r_data_keypad[0] <= 4'h4;
+                        r_data_keypad[1] <= r_data_keypad[0];
+                    end
+                    4'h5: begin
+                        r_data_keypad[0] <= 4'h5;
+                        r_data_keypad[1] <= r_data_keypad[0];
+                    end
+                    4'h6: begin
+                        r_data_keypad[0] <= 4'h6;
+                        r_data_keypad[1] <= r_data_keypad[0];
+                    end
+                    4'h7: begin
+                        if(r_setting) r_change_time <= 1;
+                        //r_setting <= 0;
+                    end
+                    4'h8: begin
+                        r_data_keypad[0] <= 4'h1;
+                        r_data_keypad[1] <= r_data_keypad[0];
+                    end
+                    4'h9: begin
+                        r_data_keypad[0] <= 4'h2;
+                        r_data_keypad[1] <= r_data_keypad[0];
+                    end
+                    4'ha: begin
+                        r_data_keypad[0] <= 4'h3;
+                        r_data_keypad[1] <= r_data_keypad[0];
+                    end
+                    4'hb: begin
+                        r_data_keypad[0] <= 4'hc;   //c
+                        r_data_keypad[1] <= r_data_keypad[0];
+                    end
+                    4'hc: begin
+                        r_data_keypad[0] <= 4'hf;   //f
+                        r_data_keypad[1] <= r_data_keypad[0];
+                    end
+                    4'hd: begin
+                        r_data_keypad[0] <= 4'h0;   //real 0
+                        r_data_keypad[1] <= r_data_keypad[0];
+                    end
+                    4'he: begin
+                        r_data_keypad[0] <= 4'he;   //e
+                        r_data_keypad[1] <= r_data_keypad[0];
+                    end
+                    4'hf: begin
+                        r_data_keypad[0] <= 4'hd;   //d
+                        r_data_keypad[1] <= r_data_keypad[0];
+                    end
+                endcase
+            end
+        end
+    end
 
 endmodule
