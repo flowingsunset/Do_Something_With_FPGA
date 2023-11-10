@@ -1,7 +1,7 @@
 # Study_Display
 
 ## done
-i2c(single master, clock stretch detection X)
+i2c(single master, ACK X, clock stretch detection X)
 
 RTC(DS1302)
 
