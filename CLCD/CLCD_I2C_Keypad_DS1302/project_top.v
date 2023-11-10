@@ -12,24 +12,17 @@ module project_top(
     output o_sclk,
     //input output Keypad
      input [3:0]i_col,
-	 output [3:0]o_row
+	 output [3:0]o_row,
+    //output alarm
+    output [3:0] led,
+    output buzzer_out
     );
 
-    reg r_clk_400khz;
-    reg [6:0]r_cnt_400khz;
-    always @(posedge clk, posedge reset_p) begin
-        if(reset_p) begin
-            r_cnt_400khz <= 0;
-            r_clk_400khz <= 0;
-        end
-        else begin
-            if(r_cnt_400khz > 120) begin
-                r_cnt_400khz <= 0;
-                r_clk_400khz <= ~r_clk_400khz;
-            end
-            else r_cnt_400khz <= r_cnt_400khz + 1;
-        end
-    end
+    parameter sys_clk_freq = 100_000_000;
+    parameter require_freq = 400_000;
+
+    //clock_gen
+    wire w_clk_400kHz;
 
     //i2c_init_reg
     wire w_RS_reg, w_RW_reg, w_valid_reg, w_empty_reg;
@@ -67,6 +60,9 @@ module project_top(
     wire [3:0] w_data_keypad;
     wire w_valid_keypad;
 
+    //alarm
+    wire w_alarm;
+    
     assign w_data_sys_reg = w_empty_reg ? w_data_SYS2CLCD : w_data_reg;
     assign w_RS_sys_reg = w_empty_reg ? w_RS_SYS2CLCD : w_RS_reg;
     assign w_RW_sys_reg = w_empty_reg ? w_RW_SYS2CLCD : w_RW_reg;
@@ -91,10 +87,13 @@ module project_top(
     //input [7:0] receive_I2C,  //not use this time
     //btw Keypad    not use now
     .data_Keypad(w_data_keypad),
-    .valid_Keypad(w_valid_keypad)
+    .valid_Keypad(w_valid_keypad),
+    //btw buzzer&led
+    .alarm(w_alarm)
     );
 
-
+    clock_gen #(.sys_clk_freq(sys_clk_freq), .require_freq(require_freq)) clock_gen
+               (.clk(clk), .reset_p(reset_p), .r_clk(w_clk_400kHz));
 
     CLCD_init_reg init_reg(.clk(clk), .reset_p(reset_p), .i_busy(w_busy_CLCD),
                    .o_data(w_data_reg), .o_RS(w_RS_reg), .o_RW(w_RW_reg), .o_valid(w_valid_reg), .o_empty(w_empty_reg));
@@ -105,12 +104,15 @@ module project_top(
                           //input output with CLCD_init_reg and system_control
                           .i_data(w_data_sys_reg), .i_RS(w_RS_sys_reg), .i_RW(w_RW_sys_reg), .i_valid(w_valid_sys_reg), .o_busy(w_busy_CLCD));
 
-    i2c_master master(.clk(r_clk_400khz),.reset_p(reset_p),.i_addr(w_addr_CLCD),.i_data(w_data_CLCD),.i_RW(w_RW_CLCD),.i_valid(w_valid_CLCD),
+    i2c_master master(.clk(w_clk_400kHz),.reset_p(reset_p),.i_addr(w_addr_CLCD),.i_data(w_data_CLCD),.i_RW(w_RW_CLCD),.i_valid(w_valid_CLCD),
                   .o_sda(o_sda),. o_scl(o_scl),. o_busy(w_busy_I2C), .r_receive());
     
-    DS1302 ds1302(.clk(r_clk_400khz), .reset_p(reset_p), .i_addr(w_addr_SYS2RTC), .i_data(w_data_SYS2RTC), .i_valid(w_valid_SYS2RTC),
+    DS1302 ds1302(.clk(w_clk_400kHz), .reset_p(reset_p), .i_addr(w_addr_SYS2RTC), .i_data(w_data_SYS2RTC), .i_valid(w_valid_SYS2RTC),
                   .o_io(o_io), .o_sclk(o_sclk), .o_ce(o_ce), .o_busy(w_busy_RTC), .r_receive(w_receive_RTC));
 
     Keypad kpd(.i_clk(clk),.i_reset(reset_p),.i_col(i_col),. o_row(o_row),. o_data(w_data_keypad),.o_btn_valid(w_valid_keypad));
+
+    alarm #(.sys_clk_freq(sys_clk_freq)) alarm
+    (.clk(clk), .reset_p(reset_p), .alarm(w_alarm), .led(led), .buzzer_out(buzzer_out));
 
 endmodule
