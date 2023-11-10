@@ -1,2 +1,10 @@
 # Study_Display
-ov7670, RaspberryPi Camera v2의 이미지를 VGA, HDMI로 출력하는 것이 목표
+
+## done
+i2c(single master, clock stretch detection X)
+RTC(DS1302)
+Keypad
+
+## to do
+micro sd(read)
+i2s
