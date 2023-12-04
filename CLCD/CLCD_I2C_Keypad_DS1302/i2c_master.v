@@ -14,9 +14,7 @@ module i2c_master (
     output wire o_scl
 );
 
-//no ack and no read
 //assume clk = 400kHz  ->  scl = 100kHz
-//i_RW = 0 for only write mode
 
 //Idle state. move to I_START if addr, data is valid(i_valid == 1)
 localparam S_IDLE = 0;
